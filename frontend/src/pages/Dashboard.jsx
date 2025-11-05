@@ -8,6 +8,7 @@ const Dashboard = () => {
   const [bookingType, setBookingType] = useState("myself");
   const user = useAuthStore((s) => s.user);
   const getProfile = useAuthStore((s) => s.getProfile);
+  const [showWarning, setShowWarning] = useState(false);
 
   const [pickup, setPickup] = useState("");
   const [destination, setDestination] = useState("");
@@ -191,6 +192,13 @@ const Dashboard = () => {
       setSubmitting(false);
     }
   };
+
+  const handleSOS = () => {
+  setShowWarning(true)
+  setTimeout(()=>{
+    setShowWarning(false)
+  }, 1500)
+};
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -629,6 +637,64 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+      {showWarning && (
+        <div
+          className="fixed inset-0 z-60 flex items-center justify-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="sos-modal-title"
+        >
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={()=>setShowWarning(false)}
+            aria-hidden="true"
+          />
+          {/* Panel */}
+          <div className="relative mx-4 w-full max-w-xl rounded-2xl bg-white shadow-2xl">
+            <div className="px-6 pt-6 pb-4">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+                <span className="text-3xl">🚨</span>
+              </div>
+              <h3
+                id="sos-modal-title"
+                className="text-2xl font-bold text-gray-900 text-center"
+              >
+                WARNING
+              </h3>
+              <p className="mt-3 text-center text-gray-700 text-lg">
+                sos message send
+              </p>
+              <p className="mt-2 text-center text-sm text-gray-500">
+                Your SOS has been triggered. Stay safe — help is being notified.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-center gap-3 px-6 pb-6">
+              <button
+                type="button"
+                onClick={()=>setShowWarning(false)}
+                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-700 hover:bg-gray-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Floating SOS button */}
+<button
+  type="button"
+  onClick={handleSOS}
+  className="fixed bottom-6 right-6 z-50 px-5 py-3 rounded-full font-semibold shadow-lg 
+             bg-red-600 text-white hover:bg-red-700 focus:outline-none focus:ring-2
+             focus:ring-red-400 focus:ring-offset-2"
+  aria-label="Send SOS"
+  title="Send SOS"
+>
+  🚨 SOS
+</button>
+
     </div>
   );
 };
