@@ -72,8 +72,8 @@ const useAuthStore = create((set, get) => ({
 
   getProfile: async () => {
     try {
-      const res = await api.get("/auth/profile/");
-    //   console.log(res)
+      const res = await api.post("/auth/profile/");
+      console.log(res)
       set({ user: res.data, isAuthenticated: true });
       return res.data;
     } catch (err) {

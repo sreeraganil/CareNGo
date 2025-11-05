@@ -15,3 +15,21 @@
   "adhaar_number": "111122223333",
   "password": "rahul123"
 }
+
+
+{
+  "booking_type": "others",
+  "passenger_name": "Rahul Kumar",
+  "passenger_aadhaar": "999988887777",
+  "passenger_phone": "9876543210",
+  "passenger_age": 40,
+  "passenger_gender": "Male",
+  "passenger_relationship": "My Parent",
+  "special_requirements": ["Wheelchair accessible vehicle", "Elderly assistance needed"],
+  "pickup_location": "Kozhikode Medical College",
+  "destination": "Home, Calicut",
+  "ride_type": "Wheelchair Accessible",
+  "passengers_count": 1,
+  "emergency_contact_name": "Anees",
+  "emergency_contact_phone": "9998887777"
+}

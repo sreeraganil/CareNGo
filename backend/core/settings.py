@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-gwii2e9j6c8qznxpg*_%cz=m4#(yn)0e5k-!5v6a45sz5+&8*d
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -127,7 +127,19 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-CORS_ALLOW_ALL_ORIGINS = True  # For development only (limit later in production)
+ # For development only (limit later in production)
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://59f83745a032.ngrok-free.app",
+]
+CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://59f83745a032.ngrok-free.app",
+    "http://localhost:5173",
+]
 
 # REST Framework Configuration
 REST_FRAMEWORK = {

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User
+from .models import User,Booking
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -18,3 +18,10 @@ class RegisterSerializer(serializers.ModelSerializer):
         password = validated_data.pop('password')
         user = User.objects.create_user(**validated_data, password=password)
         return user
+    
+    
+class BookingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Booking
+        fields = '__all__'
+        read_only_fields = ['user', 'status', 'created_at']

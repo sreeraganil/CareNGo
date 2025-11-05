@@ -1,76 +1,196 @@
-import { useEffect, useState } from "react";
+// src/pages/Dashboard.jsx
+import { useEffect, useState, useMemo } from "react";
 import useAuthStore from "../store/useAuthStore";
+import toast from "react-hot-toast";
+import api from "../api/api";
 
 const Dashboard = () => {
-  const [bookingType, setBookingType] = useState('myself');
+  const [bookingType, setBookingType] = useState("myself");
   const user = useAuthStore((s) => s.user);
   const getProfile = useAuthStore((s) => s.getProfile);
+
+  const [pickup, setPickup] = useState("");
+  const [destination, setDestination] = useState("");
+  const [rideType, setRideType] = useState("Standard SafeRide");
+  const [passengers, setPassengers] = useState("1");
+  const [emergencyName, setEmergencyName] = useState("");
+  const [emergencyPhone, setEmergencyPhone] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+
   const [otherPassenger, setOtherPassenger] = useState({
-    name: '',
-    aadhaar: '',
-    phone: '',
-    age: '',
-    gender: '',
-    relationship: '',
-    specialRequirements: []
+    name: "",
+    aadhaar: "",
+    phone: "",
+    age: "",
+    gender: "",
+    relationship: "",
+    specialRequirements: [],
   });
 
-  const quickActions = [
-    { icon: '🚗', title: 'Book Ride', description: 'Book a safe ride', color: 'bg-purple-100 text-purple-600' },
-    { icon: '👩', title: 'Women Only', description: 'Female drivers only', color: 'bg-pink-100 text-pink-600' },
-    { icon: '👶', title: 'Kids Ride', description: 'With car seats', color: 'bg-blue-100 text-blue-600' },
-    { icon: '♿', title: 'Accessible', description: 'Wheelchair friendly', color: 'bg-green-100 text-green-600' },
-  ];
-
-  const recentRides = [
-    { id: 1, from: 'Home', to: 'School', date: '2 hours ago', status: 'Completed', type: 'Kids Ride', passenger: 'My Daughter' },
-    { id: 2, from: 'Office', to: 'Mall', date: 'Yesterday', status: 'Completed', type: 'Women Only', passenger: 'Myself' },
-    { id: 3, from: 'Hospital', to: 'Home', date: '2 days ago', status: 'Completed', type: 'Accessible', passenger: 'My Mother' },
-  ];
+  const [recentRides, setRecentRides] = useState([]);
 
   const relationships = [
-    'My Child',
-    'My Parent',
-    'My Sibling',
-    'My Grandparent',
-    'My Relative',
-    'My Friend',
-    'My Dependent',
-    'Other'
+    "My Child",
+    "My Parent",
+    "My Sibling",
+    "My Grandparent",
+    "My Relative",
+    "My Friend",
+    "My Dependent",
+    "Other",
   ];
 
   const specialRequirementsOptions = [
-    'Wheelchair accessible vehicle',
-    'Child car seat required',
-    'Elderly assistance needed',
-    'Medical equipment space',
-    'Female driver preferred',
-    'Extra care needed',
-    'No music preference',
-    'Temperature control needed'
+    "Wheelchair accessible vehicle",
+    "Child car seat required",
+    "Elderly assistance needed",
+    "Medical equipment space",
+    "Female driver preferred",
+    "Extra care needed",
+    "No music preference",
+    "Temperature control needed",
   ];
 
   const handleOtherPassengerChange = (field, value) => {
-    setOtherPassenger(prev => ({
+    setOtherPassenger((prev) => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
 
   const handleSpecialRequirementToggle = (requirement) => {
-    setOtherPassenger(prev => ({
+    setOtherPassenger((prev) => ({
       ...prev,
       specialRequirements: prev.specialRequirements.includes(requirement)
-        ? prev.specialRequirements.filter(req => req !== requirement)
-        : [...prev.specialRequirements, requirement]
+        ? prev.specialRequirements.filter((req) => req !== requirement)
+        : [...prev.specialRequirements, requirement],
     }));
   };
 
+  const canSubmit = useMemo(() => {
+    if (!pickup.trim() || !destination.trim()) return false;
+    if (bookingType === "others") {
+      if (
+        !otherPassenger.name.trim() ||
+        !otherPassenger.phone.trim() ||
+        !otherPassenger.age ||
+        !otherPassenger.gender ||
+        !otherPassenger.relationship
+      ) {
+        return false;
+      }
+      if (!emergencyName.trim() || !emergencyPhone.trim()) return false;
+    }
+    return true;
+  }, [pickup, destination, bookingType, otherPassenger, emergencyName, emergencyPhone]);
 
-  useEffect(()=>{
-    getProfile()
-  },[])
+  useEffect(() => {
+    (async () => {
+      try {
+        await getProfile();
+      } catch (err) {
+        const msg =
+          err?.response?.data?.detail || err?.message || "Failed to load profile";
+        toast.error(msg);
+      } finally {
+        setLoadingProfile(false);
+      }
+    })();
 
+    fetchBookings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const fetchBookings = async () => {
+    try {
+      const res = await api.put("/auth/booking/");
+      setRecentRides(
+        (res.data || []).map((b) => ({
+          id: b.id,
+          from: b.pickup,
+          to: b.destination,
+          date: b.created_at_human || b.created_at || "",
+          status: b.status || "Created",
+          type: b.ride_type || "Standard SafeRide",
+          passenger: b.booking_type === "others"
+            ? b.other_passenger?.name || "Passenger"
+            : "Myself",
+        }))
+      );
+    } catch (e) {
+      console.warn("Failed to load bookings", e);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!canSubmit) {
+      toast.error("Please fill all required fields.");
+      return;
+    }
+
+    setSubmitting(true);
+    const loadingId = toast.loading("Booking your ride...");
+
+    const payload = {
+      pickup_location: pickup,
+      destination,
+      ride_type: rideType,
+      passengers: passengers === "4+" ? 4 : Number(passengers),
+      booking_type: bookingType,
+      other_passenger:
+        bookingType === "others"
+          ? {
+              name: otherPassenger.name,
+              aadhaar: otherPassenger.aadhaar,
+              phone: otherPassenger.phone,
+              age: Number(otherPassenger.age || 0),
+              gender: otherPassenger.gender,
+              relationship: otherPassenger.relationship,
+              special_requirements: otherPassenger.specialRequirements,
+            }
+          : null,
+      emergency_contact:
+        bookingType === "others"
+          ? {
+              name: emergencyName,
+              phone: emergencyPhone,
+            }
+          : null,
+    };
+
+    try {
+      await api.post("/auth/booking/", payload);
+      toast.success("Ride booked successfully!", { id: loadingId });
+
+      setPickup("");
+      setDestination("");
+      setRideType("Standard SafeRide");
+      setPassengers("1");
+      setEmergencyName("");
+      setEmergencyPhone("");
+      setOtherPassenger({
+        name: "",
+        aadhaar: "",
+        phone: "",
+        age: "",
+        gender: "",
+        relationship: "",
+        specialRequirements: [],
+      });
+
+      fetchBookings();
+    } catch (err) {
+      const msg =
+        err?.response?.data?.detail ||
+        (typeof err?.response?.data === "string" && err.response.data) ||
+        "Failed to create booking";
+      toast.error(msg, { id: loadingId });
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -82,9 +202,11 @@ const Dashboard = () => {
               <div className="w-8 h-8 bg-linear-to-r from-purple-600 to-pink-500 rounded-full flex items-center justify-center">
                 <span className="text-white font-bold text-sm">S</span>
               </div>
-              <span className="ml-2 text-xl font-bold text-gray-900">Care N'Go</span>
+              <span className="ml-2 text-xl font-bold text-gray-900">
+                Care N'Go
+              </span>
             </div>
-            
+
             <div className="flex items-center space-x-4">
               <button className="p-2 text-gray-600 hover:text-gray-900">
                 <span className="text-lg">🔔</span>
@@ -98,10 +220,14 @@ const Dashboard = () => {
       </header>
 
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        {/* Welcome Section */}
+        {/* Welcome */}
         <div className="px-4 py-6 sm:px-0">
           <div className="bg-linear-to-r from-purple-600 to-pink-500 rounded-2xl p-6 text-white">
-            <h1 className="text-2xl font-bold mb-2">Welcome back, {user?.username}! 👋</h1>
+            <h1 className="text-2xl font-bold mb-2">
+              {loadingProfile
+                ? "Loading profile..."
+                : `Welcome back, ${user?.username ?? user?.name ?? "Guest"}! 👋`}
+            </h1>
             <p className="opacity-90">Ready for your next safe journey?</p>
             <div className="mt-4 flex space-x-4">
               <div className="bg-white bg-opacity-20 rounded-lg px-3 py-1">
@@ -114,90 +240,94 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="px-4 py-6 sm:px-0">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {quickActions.map((action, index) => (
-              <button
-                key={index}
-                className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200 text-left"
-              >
-                <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${action.color} text-xl mb-3`}>
-                  {action.icon}
-                </div>
-                <h3 className="font-semibold text-gray-900 mb-1">{action.title}</h3>
-                <p className="text-sm text-gray-600">{action.description}</p>
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* Book Ride Card */}
         <div className="px-4 py-6 sm:px-0">
           <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Book a Safe Ride</h2>
-            
-            {/* Booking Type Selection */}
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              Book a Safe Ride
+            </h2>
+
+            {/* Booking Type */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-3">Who is traveling?</label>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Who is traveling?
+              </label>
               <div className="grid grid-cols-2 gap-4">
                 <button
                   type="button"
-                  onClick={() => setBookingType('myself')}
+                  onClick={() => setBookingType("myself")}
                   className={`p-4 border-2 rounded-xl text-left transition-all duration-200 ${
-                    bookingType === 'myself'
-                      ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-200'
-                      : 'border-gray-200 hover:border-gray-300'
+                    bookingType === "myself"
+                      ? "border-purple-500 bg-purple-50 ring-2 ring-purple-200"
+                      : "border-gray-200 hover:border-gray-300"
                   }`}
                 >
                   <div className="flex items-center">
-                    <div className={`w-6 h-6 rounded-full border-2 mr-3 flex items-center justify-center ${
-                      bookingType === 'myself' ? 'border-purple-500 bg-purple-500' : 'border-gray-300'
-                    }`}>
-                      {bookingType === 'myself' && <div className="w-2 h-2 bg-white rounded-full"></div>}
+                    <div
+                      className={`w-6 h-6 rounded-full border-2 mr-3 flex items-center justify-center ${
+                        bookingType === "myself"
+                          ? "border-purple-500 bg-purple-500"
+                          : "border-gray-300"
+                      }`}
+                    >
+                      {bookingType === "myself" && (
+                        <div className="w-2 h-2 bg-white rounded-full"></div>
+                      )}
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900">Book for Myself</h3>
-                      <p className="text-sm text-gray-600 mt-1">I will be traveling</p>
+                      <h3 className="font-semibold text-gray-900">
+                        Book for Myself
+                      </h3>
+                      <p className="text-sm text-gray-600 mt-1">
+                        I will be traveling
+                      </p>
                     </div>
                   </div>
                 </button>
-                
+
                 <button
                   type="button"
-                  onClick={() => setBookingType('others')}
+                  onClick={() => setBookingType("others")}
                   className={`p-4 border-2 rounded-xl text-left transition-all duration-200 ${
-                    bookingType === 'others'
-                      ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-200'
-                      : 'border-gray-200 hover:border-gray-300'
+                    bookingType === "others"
+                      ? "border-purple-500 bg-purple-50 ring-2 ring-purple-200"
+                      : "border-gray-200 hover:border-gray-300"
                   }`}
                 >
                   <div className="flex items-center">
-                    <div className={`w-6 h-6 rounded-full border-2 mr-3 flex items-center justify-center ${
-                      bookingType === 'others' ? 'border-purple-500 bg-purple-500' : 'border-gray-300'
-                    }`}>
-                      {bookingType === 'others' && <div className="w-2 h-2 bg-white rounded-full"></div>}
+                    <div
+                      className={`w-6 h-6 rounded-full border-2 mr-3 flex items-center justify-center ${
+                        bookingType === "others"
+                          ? "border-purple-500 bg-purple-500"
+                          : "border-gray-300"
+                      }`}
+                    >
+                      {bookingType === "others" && (
+                        <div className="w-2 h-2 bg-white rounded-full"></div>
+                      )}
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900">Book for Others</h3>
-                      <p className="text-sm text-gray-600 mt-1">Booking for family/friends</p>
+                      <h3 className="font-semibold text-gray-900">
+                        Book for Others
+                      </h3>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Booking for family/friends
+                      </p>
                     </div>
                   </div>
                 </button>
               </div>
             </div>
 
-            {/* Other Passenger Details */}
-            {bookingType === 'others' && (
+            {/* Other Passenger */}
+            {bookingType === "others" && (
               <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
                 <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
                   <span className="text-blue-600 mr-2">👥</span>
                   Passenger Details
                 </h3>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Name */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Full Name *
@@ -205,28 +335,34 @@ const Dashboard = () => {
                     <input
                       type="text"
                       value={otherPassenger.name}
-                      onChange={(e) => handleOtherPassengerChange('name', e.target.value)}
+                      onChange={(e) =>
+                        handleOtherPassengerChange("name", e.target.value)
+                      }
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                       placeholder="Enter passenger's full name"
                     />
                   </div>
 
-                  {/* Aadhaar Number */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Aadhaar Number *
+                      Aadhaar Number
                     </label>
                     <input
                       type="text"
+                      inputMode="numeric"
+                      maxLength={12}
                       value={otherPassenger.aadhaar}
-                      onChange={(e) => handleOtherPassengerChange('aadhaar', e.target.value)}
+                      onChange={(e) =>
+                        handleOtherPassengerChange(
+                          "aadhaar",
+                          e.target.value.replace(/\D/g, "").slice(0, 12)
+                        )
+                      }
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                       placeholder="Enter 12-digit Aadhaar"
-                      maxLength="12"
                     />
                   </div>
 
-                  {/* Phone Number */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Phone Number *
@@ -234,36 +370,45 @@ const Dashboard = () => {
                     <input
                       type="tel"
                       value={otherPassenger.phone}
-                      onChange={(e) => handleOtherPassengerChange('phone', e.target.value)}
+                      onChange={(e) =>
+                        handleOtherPassengerChange("phone", e.target.value)
+                      }
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                       placeholder="Enter phone number"
                     />
                   </div>
 
-                  {/* Age */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Age *
                     </label>
                     <input
                       type="number"
+                      min={1}
+                      max={120}
                       value={otherPassenger.age}
-                      onChange={(e) => handleOtherPassengerChange('age', e.target.value)}
+                      onChange={(e) =>
+                        handleOtherPassengerChange(
+                          "age",
+                          String(
+                            Math.max(1, Math.min(120, Number(e.target.value || 0)))
+                          )
+                        )
+                      }
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                       placeholder="Enter age"
-                      min="1"
-                      max="120"
                     />
                   </div>
 
-                  {/* Gender */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Gender *
                     </label>
                     <select
                       value={otherPassenger.gender}
-                      onChange={(e) => handleOtherPassengerChange('gender', e.target.value)}
+                      onChange={(e) =>
+                        handleOtherPassengerChange("gender", e.target.value)
+                      }
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                     >
                       <option value="">Select Gender</option>
@@ -274,25 +419,27 @@ const Dashboard = () => {
                     </select>
                   </div>
 
-                  {/* Relationship */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Relationship *
                     </label>
                     <select
                       value={otherPassenger.relationship}
-                      onChange={(e) => handleOtherPassengerChange('relationship', e.target.value)}
+                      onChange={(e) =>
+                        handleOtherPassengerChange("relationship", e.target.value)
+                      }
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                     >
                       <option value="">Select Relationship</option>
-                      {relationships.map(rel => (
-                        <option key={rel} value={rel}>{rel}</option>
+                      {relationships.map((rel) => (
+                        <option key={rel} value={rel}>
+                          {rel}
+                        </option>
                       ))}
                     </select>
                   </div>
                 </div>
 
-                {/* Special Requirements */}
                 <div className="mt-4">
                   <label className="block text-sm font-medium text-gray-700 mb-3">
                     Special Requirements
@@ -302,33 +449,81 @@ const Dashboard = () => {
                       <label key={index} className="flex items-center">
                         <input
                           type="checkbox"
-                          checked={otherPassenger.specialRequirements.includes(requirement)}
-                          onChange={() => handleSpecialRequirementToggle(requirement)}
+                          checked={otherPassenger.specialRequirements.includes(
+                            requirement
+                          )}
+                          onChange={() =>
+                            handleSpecialRequirementToggle(requirement)
+                          }
                           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                         />
-                        <span className="ml-2 text-sm text-gray-700">{requirement}</span>
+                        <span className="ml-2 text-sm text-gray-700">
+                          {requirement}
+                        </span>
                       </label>
                     ))}
+                  </div>
+                </div>
+
+                {/* Emergency Contact */}
+                <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200 mt-4">
+                  <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                    <span className="text-yellow-600 mr-2">📞</span>
+                    Emergency Contact
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Contact Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={emergencyName}
+                        onChange={(e) => setEmergencyName(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none"
+                        placeholder="Emergency contact name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Contact Phone *
+                      </label>
+                      <input
+                        type="tel"
+                        value={emergencyPhone}
+                        onChange={(e) => setEmergencyPhone(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none"
+                        placeholder="Emergency contact number"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
             )}
 
             {/* Ride Booking Form */}
-            <div className="space-y-4">
+            <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Pickup Location *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Pickup Location *
+                  </label>
                   <input
                     type="text"
+                    value={pickup}
+                    onChange={(e) => setPickup(e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
                     placeholder="Enter pickup location"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Destination *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Destination *
+                  </label>
                   <input
                     type="text"
+                    value={destination}
+                    onChange={(e) => setDestination(e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
                     placeholder="Enter destination"
                   />
@@ -337,8 +532,14 @@ const Dashboard = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Ride Type *</label>
-                  <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Ride Type *
+                  </label>
+                  <select
+                    value={rideType}
+                    onChange={(e) => setRideType(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                  >
                     <option>Standard SafeRide</option>
                     <option>Women Only</option>
                     <option>Kids Friendly</option>
@@ -348,8 +549,14 @@ const Dashboard = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Passengers *</label>
-                  <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Passengers *
+                  </label>
+                  <select
+                    value={passengers}
+                    onChange={(e) => setPassengers(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                  >
                     <option>1</option>
                     <option>2</option>
                     <option>3</option>
@@ -358,38 +565,23 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              {/* Emergency Contact for Others */}
-              {bookingType === 'others' && (
-                <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                  <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
-                    <span className="text-yellow-600 mr-2">📞</span>
-                    Emergency Contact
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Contact Name *</label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none"
-                        placeholder="Emergency contact name"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Contact Phone *</label>
-                      <input
-                        type="tel"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none"
-                        placeholder="Emergency contact number"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <button className="w-full bg-linear-to-r from-purple-600 to-pink-500 text-white py-3 px-4 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-600 transition-all duration-200">
-                {bookingType === 'myself' ? 'Find My Safe Ride' : 'Book Ride for Passenger'}
+              <button
+                type="submit"
+                disabled={!canSubmit || submitting}
+                className={`w-full text-white py-3 px-4 rounded-lg font-semibold transition-all duration-200
+                ${
+                  !canSubmit || submitting
+                    ? "bg-gray-300 cursor-not-allowed"
+                    : "bg-linear-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600"
+                }`}
+              >
+                {submitting
+                  ? "Booking..."
+                  : bookingType === "myself"
+                  ? "Find My Safe Ride"
+                  : "Book Ride for Passenger"}
               </button>
-            </div>
+            </form>
           </div>
         </div>
 
@@ -397,59 +589,43 @@ const Dashboard = () => {
         <div className="px-4 py-6 sm:px-0">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Rides</h2>
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
-            {recentRides.map((ride) => (
-              <div key={ride.id} className="p-4 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors duration-200">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="flex items-center space-x-2 mb-1">
-                      <span className="font-medium text-gray-900">{ride.from} → {ride.to}</span>
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        ride.type === 'Women Only' ? 'bg-pink-100 text-pink-800' :
-                        ride.type === 'Kids Ride' ? 'bg-blue-100 text-blue-800' :
-                        'bg-green-100 text-green-800'
-                      }`}>
-                        {ride.type}
-                      </span>
+            {recentRides.length === 0 ? (
+              <div className="p-6 text-sm text-gray-500">No rides yet.</div>
+            ) : (
+              recentRides.map((ride) => (
+                <div
+                  key={ride.id}
+                  className="p-4 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors duration-200"
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="flex items-center space-x-2 mb-1">
+                        <span className="font-medium text-gray-900">
+                          {ride.from} → {ride.to}
+                        </span>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs ${
+                            ride.type === "Women Only"
+                              ? "bg-pink-100 text-pink-800"
+                              : ride.type === "Kids Friendly"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-green-100 text-green-800"
+                          }`}
+                        >
+                          {ride.type}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        {ride.date} • For: {ride.passenger}
+                      </p>
                     </div>
-                    <p className="text-sm text-gray-600">{ride.date} • For: {ride.passenger}</p>
+                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                      {ride.status}
+                    </span>
                   </div>
-                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                    {ride.status}
-                  </span>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Safety Features */}
-        <div className="px-4 py-6 sm:px-0">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Safety Features</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-center">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                <span className="text-purple-600 text-xl">🛡️</span>
-              </div>
-              <h3 className="font-medium text-gray-900 text-sm">Emergency Button</h3>
-            </div>
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-center">
-              <div className="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                <span className="text-pink-600 text-xl">📱</span>
-              </div>
-              <h3 className="font-medium text-gray-900 text-sm">Live Tracking</h3>
-            </div>
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-center">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                <span className="text-blue-600 text-xl">👥</span>
-              </div>
-              <h3 className="font-medium text-gray-900 text-sm">Share Ride</h3>
-            </div>
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-center">
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                <span className="text-green-600 text-xl">⭐</span>
-              </div>
-              <h3 className="font-medium text-gray-900 text-sm">Verified Drivers</h3>
-            </div>
+              ))
+            )}
           </div>
         </div>
       </div>

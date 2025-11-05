@@ -165,7 +165,7 @@ const Register = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-purple-600 to-pink-500 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-600 transition shadow-md hover:shadow-lg"
+              className="w-full bg-linear-to-r from-purple-600 to-pink-500 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-600 transition shadow-md hover:shadow-lg"
             >
               {loading ? "Creating Account..." : "Create Account"}
             </button>
