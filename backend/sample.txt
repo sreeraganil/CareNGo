@@ -1,0 +1,17 @@
+/api/auth/register/  
+/api/auth/login/  
+/api/auth/token/refresh/
+
+
+
+
+{
+  "name": "Rahul Kumar",
+  "email": "rahul@example.com",
+  "phone": "9123456780",
+  "address": "Kochi, Kerala",
+  "age": 35,
+  "gender": "Male",
+  "adhaar_number": "111122223333",
+  "password": "rahul123"
+}

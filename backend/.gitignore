@@ -1,0 +1,21 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Local configuration and secrets
+.env
+local_settings.py
+
+# Standard local database
+db.sqlite3
+
+# Virtual environment directory
+venv/
+env/
+
+# User-uploaded media
+media/
+
+# OS generated files
+.DS_Store
+Thumbs.db
